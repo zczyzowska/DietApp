@@ -1,0 +1,41 @@
+{
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "diet-app-23456",
+                    "appId": "1:986531705132:android:df9ebd37d9f48248913c89",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "ios": {
+                "default": {
+                    "projectId": "diet-app-23456",
+                    "appId": "1:986531705132:ios:e06dfa8a328a224b913c89",
+                    "uploadDebugSymbols": false,
+                    "fileOutput": "ios/Runner/GoogleService-Info.plist"
+                }
+            },
+            "macos": {
+                "default": {
+                    "projectId": "diet-app-23456",
+                    "appId": "1:986531705132:ios:9144e809e4f353d1913c89",
+                    "uploadDebugSymbols": false,
+                    "fileOutput": "macos/Runner/GoogleService-Info.plist"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "diet-app-23456",
+                    "configurations": {
+                        "android": "1:986531705132:android:df9ebd37d9f48248913c89",
+                        "ios": "1:986531705132:ios:e06dfa8a328a224b913c89",
+                        "macos": "1:986531705132:ios:9144e809e4f353d1913c89",
+                        "web": "1:986531705132:web:17b609c03dcce8ce913c89",
+                        "windows": "1:986531705132:web:d89cd2a7309acfa7913c89"
+                    }
+                }
+            }
+        }
+    }
+}
