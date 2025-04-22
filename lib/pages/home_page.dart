@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  HomePage({super.key});
+
+  final user = FirebaseAuth.instance.currentUser!;
 
   void signUserOut() {
     FirebaseAuth.instance.signOut();
@@ -19,8 +21,8 @@ class HomePage extends StatelessWidget {
       ),
       body: Center(
         child: Text(
-          'Welcome to the Diet App!',
-          style: TextStyle(fontSize: 24, color: Colors.black),
+          'Welcome to the Diet App!: ${user.email}',
+          style: TextStyle(fontSize: 18, color: Colors.black),
         ),
       ),
     );
