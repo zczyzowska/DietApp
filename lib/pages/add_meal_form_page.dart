@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AddMealFormPage extends StatefulWidget {
   const AddMealFormPage({super.key});
@@ -13,15 +15,28 @@ class _AddMealFormPageState extends State<AddMealFormPage> {
   String _name = '';
   int _grams = 0;
   int _kcal = 0;
+  int _protein = 0;
+  int _fats = 0;
+  int _carbs = 0;
+  File? _selectedImage;
 
   final List<String> mealTypes = [
     'Śniadanie',
     'II Śniadanie',
-    'Lunch',
     'Obiad',
+    'Deser',
     'Kolacja',
     'Przekąska',
   ];
+
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _selectedImage = File(picked.path);
+      });
+    }
+  }
 
   void saveMeal() {
     if (_formKey.currentState!.validate()) {
@@ -31,6 +46,10 @@ class _AddMealFormPageState extends State<AddMealFormPage> {
         'name': _name,
         'grams': _grams,
         'kcal': _kcal,
+        'protein': _protein,
+        'fats': _fats,
+        'carbs': _carbs,
+        'image': _selectedImage, // przekazujemy obraz
       });
     }
   }
@@ -48,9 +67,12 @@ class _AddMealFormPageState extends State<AddMealFormPage> {
               DropdownButtonFormField<String>(
                 value: _type,
                 items:
-                    mealTypes.map((type) {
-                      return DropdownMenuItem(value: type, child: Text(type));
-                    }).toList(),
+                    mealTypes
+                        .map(
+                          (type) =>
+                              DropdownMenuItem(value: type, child: Text(type)),
+                        )
+                        .toList(),
                 onChanged: (val) => setState(() => _type = val!),
                 decoration: const InputDecoration(labelText: 'Typ posiłku'),
               ),
@@ -81,6 +103,32 @@ class _AddMealFormPageState extends State<AddMealFormPage> {
                             : null,
                 onSaved: (value) => _kcal = int.parse(value!),
               ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Białko (g)'),
+                keyboardType: TextInputType.number,
+                onSaved: (value) => _protein = int.parse(value!),
+              ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Tłuszcze (g)'),
+                keyboardType: TextInputType.number,
+                onSaved: (value) => _fats = int.parse(value!),
+              ),
+              TextFormField(
+                decoration: const InputDecoration(labelText: 'Węglowodany (g)'),
+                keyboardType: TextInputType.number,
+                onSaved: (value) => _carbs = int.parse(value!),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.photo),
+                label: const Text('Dodaj zdjęcie z galerii'),
+              ),
+              if (_selectedImage != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Image.file(_selectedImage!, height: 150),
+                ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: saveMeal,

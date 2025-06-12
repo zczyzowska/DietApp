@@ -75,7 +75,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 //username textfield
                 MyTextfield(
                   controller: emailController,
-                  hintText: 'Username',
+                  hintText: 'Email',
                   obscureText: false,
                 ),
                 const SizedBox(height: 10),
