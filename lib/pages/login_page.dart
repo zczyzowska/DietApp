@@ -1,12 +1,14 @@
 import 'package:diet_app/components/my_button.dart';
 import 'package:diet_app/components/my_textfield.dart';
 import 'package:diet_app/components/square_tile.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:diet_app/services/auth_service.dart';
+import 'package:diet_app/pages/home_page.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onTap;
-  const LoginPage({super.key, required this.onTap});
+  const LoginPage({super.key, this.onTap});
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -16,31 +18,45 @@ class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
-  void signUserIn() async {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return const Center(child: CircularProgressIndicator());
-      },
-    );
-    try {
-      //sign user in
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text,
-        password: passwordController.text,
-      );
-      Navigator.pop(context); // close the loading circle
-    } on FirebaseAuthException {
-      Navigator.pop(context);
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Email or Password is incorrect'),
-          );
-        },
-      );
+  bool _isLoading = false;
+
+  // 🔹 Logowanie użytkownika z backendem Flask
+  Future<void> signUserIn() async {
+    setState(() => _isLoading = true);
+
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    // prostą walidację pól możesz dodać tutaj
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Fill in all fields')));
+      setState(() => _isLoading = false);
+      return;
     }
+
+    try {
+      final success = await AuthService.login(email, password);
+
+      if (success) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid email or password')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login error: $e')));
+    }
+
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -90,7 +106,9 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: 25),
                 //sign in button
-                MyButton(onTap: signUserIn, text: 'Sign In'),
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : MyButton(onTap: signUserIn, text: 'Sign In'),
                 const SizedBox(height: 50),
                 // or continue with
                 Row(
@@ -134,7 +152,15 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(width: 4),
                     GestureDetector(
-                      onTap: widget.onTap,
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RegisterPage(),
+                          ),
+                        );
+                      },
                       child: const Text(
                         'Register now',
                         style: TextStyle(

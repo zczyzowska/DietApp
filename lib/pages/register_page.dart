@@ -1,12 +1,13 @@
 import 'package:diet_app/components/my_button.dart';
 import 'package:diet_app/components/my_textfield.dart';
 import 'package:diet_app/components/square_tile.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:diet_app/services/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:diet_app/pages/login_page.dart';
 
 class RegisterPage extends StatefulWidget {
   final Function()? onTap;
-  const RegisterPage({super.key, required this.onTap});
+  const RegisterPage({super.key, this.onTap});
   @override
   State<RegisterPage> createState() => _RegisterPageState();
 }
@@ -17,35 +18,61 @@ class _RegisterPageState extends State<RegisterPage> {
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
-  void signUserUp() async {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return const Center(child: CircularProgressIndicator());
-      },
-    );
+  bool _isLoading = false;
+
+  Future<void> signUserUp() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    final confirmPassword = confirmPasswordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      _showErrorMessage('Fill in all fields');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showErrorMessage('Passwords do not match');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
     try {
-      if (passwordController.text == confirmPasswordController.text) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: emailController.text,
-          password: passwordController.text,
+      final success = await AuthService.register(email, password);
+
+      if (success) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created successfully!')),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
         );
       } else {
-        showErrorMessage('Passwords do not match');
+        _showErrorMessage('Registration failed');
       }
-      Navigator.pop(context); // close the loading circle
-    } on FirebaseAuthException catch (e) {
-      Navigator.pop(context);
-      showErrorMessage(e.code);
+    } catch (e) {
+      _showErrorMessage('Error: $e');
     }
+
+    setState(() => _isLoading = false);
   }
 
-  void showErrorMessage(String message) {
+  void _showErrorMessage(String message) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(title: Center(child: Text(message)));
-      },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Error'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
     );
   }
 
@@ -94,7 +121,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 SizedBox(height: 25),
                 //sign in button
-                MyButton(onTap: signUserUp, text: 'Sign Up'),
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : MyButton(onTap: signUserUp, text: 'Sign Up'),
                 const SizedBox(height: 50),
                 // or continue with
                 Row(

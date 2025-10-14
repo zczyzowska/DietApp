@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:diet_app/services/api_service.dart'; // 🔹 Zmien na swoją ścieżkę
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,16 +10,16 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final _formKey = GlobalKey<FormState>();
-  final userId = FirebaseAuth.instance.currentUser!.uid;
 
   final TextEditingController _nameController = TextEditingController();
   String? _gender;
   int? _age;
   double? _height;
   double? _weight;
-  String _activityLevel = 'niska';
-  String _goal = 'utrzymać wagę';
+  String _activityLevel = 'low';
+  String _goal = 'maintain weight';
   double? _targetWeight;
+  int? _durationWeeks;
 
   Map<String, dynamic>? _calculatedData;
   bool _isEditing = false;
@@ -32,19 +31,18 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadUserProfile() async {
-    final doc =
-        await FirebaseFirestore.instance.collection('users').doc(userId).get();
-    if (doc.exists) {
-      final data = doc.data()!;
+    final data = await ApiService.getUserProfile(); // 🔹 GET /profile
+    if (data != null) {
       setState(() {
         _nameController.text = data['name'] ?? '';
         _gender = data['gender'];
         _age = data['age'];
         _height = (data['height'] as num?)?.toDouble();
         _weight = (data['weight'] as num?)?.toDouble();
-        _activityLevel = data['activityLevel'] ?? 'niska';
-        _goal = data['goal'] ?? 'utrzymać wagę';
+        _activityLevel = data['activityLevel'] ?? 'low';
+        _goal = data['goal'] ?? 'maintain weight';
         _targetWeight = (data['targetWeight'] as num?)?.toDouble();
+        _durationWeeks = (data['durationWeeks'] as num?)?.toInt();
         _calculatedData = data['calculated'] as Map<String, dynamic>?;
       });
     }
@@ -53,66 +51,39 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final bmr =
-        _gender == 'kobieta'
-            ? 655 + (9.6 * _weight!) + (1.8 * _height!) - (4.7 * _age!)
-            : 66 + (13.7 * _weight!) + (5 * _height!) - (6.8 * _age!);
-
-    final activityMultipliers = {
-      'niska': 1.2,
-      'umiarkowana': 1.5,
-      'wysoka': 1.8,
-    };
-
-    double maintenanceCalories =
-        bmr * (activityMultipliers[_activityLevel] ?? 1.2);
-
-    double targetCalories;
-    if (_goal == 'schudnąć') {
-      targetCalories = maintenanceCalories - 500;
-    } else if (_goal == 'przytyć') {
-      targetCalories = maintenanceCalories + 300;
-    } else {
-      targetCalories = maintenanceCalories;
-    }
-
-    final protein = _weight! * 2.0;
-    final fat = _weight! * 1.0;
-    final carbs = (targetCalories - (protein * 4 + fat * 9)) / 4;
-
-    final calculated = {
-      'calories': targetCalories.round(),
-      'protein': protein.round(),
-      'fats': fat.round(),
-      'carbs': carbs.round(),
-    };
-
-    await FirebaseFirestore.instance.collection('users').doc(userId).set({
+    final profileData = {
       'name': _nameController.text,
       'gender': _gender,
-      'age': _age,
-      'height': _height,
-      'weight': _weight,
+      'age': _age ?? 0,
+      'height': _height ?? 0.0,
+      'weight': _weight ?? 0.0,
       'activityLevel': _activityLevel,
       'goal': _goal,
-      'targetWeight': _targetWeight,
-      'calculated': calculated,
-    });
+      'targetWeight': _targetWeight ?? 0.0,
+      'durationWeeks': _durationWeeks ?? 0,
+    };
 
-    setState(() {
-      _calculatedData = calculated;
-      _isEditing = false;
-    });
+    final result = await ApiService.updateUserProfile(profileData);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Profil zapisany')));
+    if (result != null) {
+      setState(() {
+        _calculatedData = result['calculated'];
+        _isEditing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil zapisany pomyślnie!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nie udało się zapisać profilu')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil użytkownika')),
+      appBar: AppBar(title: const Text('User Profile')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: _isEditing ? _buildForm() : _buildProfileSummary(),
@@ -125,14 +96,11 @@ class _ProfilePageState extends State<ProfilePage> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Brak personalizacji profilu',
-            style: TextStyle(fontSize: 18),
-          ),
+          const Text('Profile incomplete', style: TextStyle(fontSize: 18)),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () => setState(() => _isEditing = true),
-            child: const Text('Edytuj profil'),
+            child: const Text('Edit Profile'),
           ),
         ],
       );
@@ -141,30 +109,30 @@ class _ProfilePageState extends State<ProfilePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Imię: ${_nameController.text}'),
-        Text('Płeć: $_gender'),
-        Text('Wiek: $_age lat'),
-        Text('Wzrost: ${_height!.toStringAsFixed(1)} cm'),
-        Text('Waga: ${_weight!.toStringAsFixed(1)} kg'),
-        Text('Aktywność: $_activityLevel'),
-        Text('Cel: $_goal'),
+        Text('Name: ${_nameController.text}'),
+        Text('Gender: $_gender'),
+        Text('Age: $_age years'),
+        Text('Height: ${_height!.toStringAsFixed(1)} cm'),
+        Text('Weight: ${_weight!.toStringAsFixed(1)} kg'),
+        Text('Activity Level: $_activityLevel'),
+        Text('Goal: $_goal'),
         if (_targetWeight != null)
-          Text('Waga docelowa: ${_targetWeight!.toStringAsFixed(1)} kg'),
+          Text('Target Weight: ${_targetWeight!.toStringAsFixed(1)} kg'),
         const SizedBox(height: 16),
         if (_calculatedData != null) ...[
           const Text(
-            'Zapotrzebowanie dzienne:',
+            'Daily Caloric Needs:',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          Text('Kalorie: ${_calculatedData!['calories']} kcal'),
-          Text('Białko: ${_calculatedData!['protein']} g'),
-          Text('Tłuszcze: ${_calculatedData!['fats']} g'),
-          Text('Węglowodany: ${_calculatedData!['carbs']} g'),
+          Text('Calories: ${_calculatedData!['kcal']} kcal'),
+          Text('Protein: ${_calculatedData!['protein']} g'),
+          Text('Fats: ${_calculatedData!['fats']} g'),
+          Text('Carbs: ${_calculatedData!['carbs']} g'),
         ],
         const SizedBox(height: 24),
         ElevatedButton(
           onPressed: () => setState(() => _isEditing = true),
-          child: const Text('Edytuj profil'),
+          child: const Text('Edit Profile'),
         ),
       ],
     );
@@ -177,81 +145,101 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           TextFormField(
             controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Imię'),
+            decoration: const InputDecoration(labelText: 'Name'),
           ),
-          const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: _gender,
             items:
-                ['kobieta', 'mężczyzna']
+                ['woman', 'man']
                     .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                     .toList(),
             onChanged: (val) => setState(() => _gender = val),
-            decoration: const InputDecoration(labelText: 'Płeć'),
-            validator: (val) => val == null ? 'Wybierz płeć' : null,
+            decoration: const InputDecoration(labelText: 'Gender'),
+            validator: (val) => val == null ? 'Select gender' : null,
           ),
           TextFormField(
-            decoration: const InputDecoration(labelText: 'Wiek'),
+            decoration: const InputDecoration(labelText: 'Age'),
             keyboardType: TextInputType.number,
             initialValue: _age?.toString(),
             onChanged: (val) => _age = int.tryParse(val),
+            validator: (val) => val == null || val.isEmpty ? 'Enter age' : null,
           ),
           TextFormField(
-            decoration: const InputDecoration(labelText: 'Wzrost (cm)'),
+            decoration: const InputDecoration(labelText: 'Height (cm)'),
             keyboardType: TextInputType.number,
             initialValue: _height?.toString(),
             onChanged: (val) => _height = double.tryParse(val),
+            validator:
+                (val) => val == null || val.isEmpty ? 'Enter height' : null,
           ),
           TextFormField(
-            decoration: const InputDecoration(labelText: 'Waga (kg)'),
+            decoration: const InputDecoration(labelText: 'Weight (kg)'),
             keyboardType: TextInputType.number,
             initialValue: _weight?.toString(),
             onChanged: (val) => _weight = double.tryParse(val),
+            validator:
+                (val) => val == null || val.isEmpty ? 'Enter weight' : null,
           ),
           DropdownButtonFormField<String>(
             value: _activityLevel,
-            decoration: const InputDecoration(labelText: 'Poziom aktywności'),
+            decoration: const InputDecoration(labelText: 'Activity Level'),
             items:
-                ['niska', 'umiarkowana', 'wysoka']
+                ['very low', 'low', 'moderate', 'high', 'very high']
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
             onChanged: (val) => setState(() => _activityLevel = val!),
           ),
           DropdownButtonFormField<String>(
             value: _goal,
-            decoration: const InputDecoration(labelText: 'Cel'),
+            decoration: const InputDecoration(labelText: 'Goal'),
             items:
-                ['schudnąć', 'utrzymać wagę', 'przytyć']
+                ['lose weight', 'maintain weight', 'gain weight']
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
-            onChanged: (val) => setState(() => _goal = val!),
+            onChanged: (val) {
+              setState(() {
+                _goal = val!;
+                if (_goal == 'maintain weight') {
+                  _targetWeight = null;
+                  _durationWeeks = null;
+                }
+              });
+            },
           ),
-          if (_goal != 'utrzymać wagę')
+
+          if (_goal != 'maintain weight') ...[
             TextFormField(
-              decoration: InputDecoration(
-                labelText:
-                    _goal == 'schudnąć'
-                        ? 'Do ilu kg schudnąć'
-                        : 'Do ilu kg przytyć',
+              decoration: const InputDecoration(
+                labelText: 'Target weight (kg)',
               ),
               keyboardType: TextInputType.number,
               initialValue: _targetWeight?.toString(),
               onChanged: (val) => _targetWeight = double.tryParse(val),
+              validator: (val) {
+                if (_goal != 'maintain weight' &&
+                    (val == null || val.isEmpty)) {
+                  return 'Enter target weight';
+                }
+                return null;
+              },
             ),
+            TextFormField(
+              decoration: const InputDecoration(labelText: 'Duration (weeks)'),
+              keyboardType: TextInputType.number,
+              initialValue: _durationWeeks?.toString(),
+              onChanged: (val) => _durationWeeks = int.tryParse(val),
+              validator: (val) {
+                if (_goal != 'maintain weight' &&
+                    (val == null || val.isEmpty)) {
+                  return 'Enter duration';
+                }
+                return null;
+              },
+            ),
+          ],
+
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ElevatedButton(
-                onPressed: _saveProfile,
-                child: const Text('Zapisz'),
-              ),
-              TextButton(
-                onPressed: () => setState(() => _isEditing = false),
-                child: const Text('Anuluj'),
-              ),
-            ],
-          ),
+          ElevatedButton(onPressed: _saveProfile, child: const Text('Save')),
         ],
       ),
     );

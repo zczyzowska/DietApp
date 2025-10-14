@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'add_meal_form_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'confirm_meal_screen.dart';
 import 'meal_details.dart';
-import 'package:diet_app/components/load_images_to_s3.dart';
 import 'profile_page.dart';
+import 'login_page.dart';
+import 'package:diet_app/services/api_service.dart';
+import 'package:diet_app/services/auth_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,220 +18,160 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final user = FirebaseAuth.instance.currentUser!;
   List<Map<String, dynamic>> meals = [];
-  int totalKcal = 0;
-  int totalProtein = 0;
-  int totalFats = 0;
-  int totalCarbs = 0;
-  int? dailyCalorieGoal;
-  int? proteinGoal;
-  int? fatGoal;
-  int? carbGoal;
+  double totalKcal = 0;
+  double totalProtein = 0;
+  double totalFats = 0;
+  double totalCarbs = 0;
+  double? dailyCalorieGoal;
+  double? proteinGoal;
+  double? fatGoal;
+  double? carbGoal;
   DateTime selectedDate = DateTime.now();
 
   IconData _getMealIcon(String type) {
     switch (type) {
-      case 'Śniadanie':
+      case 'Breakfast':
         return Icons.breakfast_dining;
-      case 'II Śniadanie':
+      case 'Second Breakfast':
         return Icons.bakery_dining;
-      case 'Obiad':
+      case 'Lunch':
         return Icons.dinner_dining;
-      case 'Deser':
+      case 'Dessert':
         return Icons.icecream;
-      case 'Kolacja':
+      case 'Dinner':
         return Icons.brunch_dining;
-      case 'Przekąska':
+      case 'Snack':
         return Icons.cookie;
       default:
         return Icons.restaurant;
     }
   }
 
-  void signUserOut() {
-    FirebaseAuth.instance.signOut();
-  }
-
   Future<void> loadUserGoals() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
     try {
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .get();
-      final data = doc.data();
+      final data =
+          await ApiService.getUserProfile(); // 🔹 GET /profile z backendu
 
       if (data != null && data['calculated'] != null) {
         final calculated = data['calculated'];
 
         setState(() {
           dailyCalorieGoal =
-              calculated['calories'] is int
-                  ? calculated['calories']
-                  : int.tryParse('${calculated['calories']}');
+              calculated['kcal'] is double
+                  ? calculated['kcal']
+                  : double.tryParse('${calculated['kcal']}');
 
           proteinGoal =
-              calculated['protein'] is int
+              calculated['protein'] is double
                   ? calculated['protein']
-                  : int.tryParse('${calculated['protein']}');
+                  : double.tryParse('${calculated['protein']}');
 
           fatGoal =
-              calculated['fats'] is int
+              calculated['fats'] is double
                   ? calculated['fats']
-                  : int.tryParse('${calculated['fats']}');
+                  : double.tryParse('${calculated['fats']}');
 
           carbGoal =
-              calculated['carbs'] is int
+              calculated['carbs'] is double
                   ? calculated['carbs']
-                  : int.tryParse('${calculated['carbs']}');
+                  : double.tryParse('${calculated['carbs']}');
         });
       }
     } catch (e) {
-      print('Błąd przy ładowaniu danych profilu: $e');
+      print('Error loading user profile data: $e');
     }
   }
 
-  Future<void> loadMealsFromFirestore() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    final date = DateFormat('yyyy-MM-dd').format(selectedDate);
-
+  Future<void> loadMeals() async {
     try {
-      final snapshot =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .collection('meals')
-              .doc(date)
-              .collection('items')
-              .get();
+      String date = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final data = await ApiService.getMeals(
+        date,
+      ); // GET /meals?date=yyyy-MM-dd
 
-      final loadedMeals =
-          snapshot.docs.map((doc) {
-            final data = doc.data();
+      if (data.isNotEmpty) {
+        final loadedMeals =
+            (data as List).map((meal) {
+              return {
+                'id': meal['id'],
+                'type': meal['type'] ?? 'Not specified',
+                'name': meal['name'] ?? 'Not specified',
+                'grams': (meal['grams'] ?? 0).toDouble(),
+                'kcal': (meal['kcal'] ?? 0).toDouble(),
+                'protein': (meal['protein'] ?? 0).toDouble(),
+                'fats': (meal['fats'] ?? 0).toDouble(),
+                'carbs': (meal['carbs'] ?? 0).toDouble(),
+                'image_url': meal['image_url'],
+              };
+            }).toList();
 
-            // Upewniamy się, że każdy posiłek ma wymagane dane i parsujemy
-            return {
-              'id': doc.id,
-              'type': data['type'] ?? 'Nieznany',
-              'name': data['name'] ?? 'Bez nazwy',
-              'grams': data['grams'] ?? 0,
-              'kcal': int.tryParse(data['kcal'].toString()) ?? 0,
-              'protein': int.tryParse(data['protein'].toString()) ?? 0,
-              'fats': int.tryParse(data['fats'].toString()) ?? 0,
-              'carbs': int.tryParse(data['carbs'].toString()) ?? 0,
-              'imageKey': data['imageKey'],
-            };
-          }).toList();
-
-      setState(() {
-        meals = loadedMeals;
-        totalKcal = meals.fold(0, (suma, meal) {
-          final kcal = meal['kcal'];
-          return suma +
-              (kcal is int ? kcal : int.tryParse(kcal.toString()) ?? 0);
+        setState(() {
+          meals = loadedMeals;
+          totalKcal = meals.fold(0.0, (sum, m) => sum + (m['kcal'] as double));
+          totalProtein = meals.fold(
+            0.0,
+            (sum, m) => sum + (m['protein'] as double),
+          );
+          totalFats = meals.fold(0.0, (sum, m) => sum + (m['fats'] as double));
+          totalCarbs = meals.fold(
+            0.0,
+            (sum, m) => sum + (m['carbs'] as double),
+          );
         });
-        totalProtein = meals.fold(0, (suma, meal) {
-          final protein = meal['protein'];
-          return suma +
-              (protein is int
-                  ? protein
-                  : int.tryParse(protein.toString()) ?? 0);
-        });
-        totalFats = meals.fold(0, (suma, meal) {
-          final fat = meal['fats'];
-          return suma + (fat is int ? fat : int.tryParse(fat.toString()) ?? 0);
-        });
-        totalCarbs = meals.fold(0, (suma, meal) {
-          final carbs = meal['carbs'];
-          return suma +
-              (carbs is int ? carbs : int.tryParse(carbs.toString()) ?? 0);
-        });
-      });
 
-      print("Załadowano ${loadedMeals.length} posiłków z Firestore.");
-    } catch (e) {
-      print("Błąd przy ładowaniu danych z Firestore: $e");
-    }
-  }
-
-  Future<void> saveMealToFirestore(
-    Map<String, dynamic> meal, [
-    File? imageFile,
-  ]) async {
-    final userId = FirebaseAuth.instance.currentUser!.uid;
-    final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    if (imageFile != null) {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final imageKey = await uploadImageToS3(imageFile, fileName);
-      if (imageKey != null) {
-        meal['imageKey'] = imageKey;
-      }
-    }
-
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('meals')
-        .doc(date)
-        .collection('items')
-        .add(meal);
-  }
-
-  Future<Map<String, dynamic>> analyzeImageWithGemini(File imageFile) async {
-    final uri = Uri.parse(
-      'https://diet-app-backend-rdbj.onrender.com/analyze-meal',
-    );
-
-    final request = http.MultipartRequest('POST', uri);
-    request.files.add(
-      await http.MultipartFile.fromPath('image', imageFile.path),
-    );
-
-    try {
-      final response = await request.send();
-      final resBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        final data = json.decode(resBody);
-
-        if (data['result'] == null) {
-          return {
-            'name': '',
-            'grams': 0,
-            'kcal': 0,
-            'protein': 0,
-            'fats': 0,
-            'carbs': 0,
-          };
-        }
-
-        String rawResult = data['result'];
-
-        // Usuń markdown z odpowiedzi
-        String cleanedResult =
-            rawResult
-                .replaceAll(RegExp(r'```json\n'), '')
-                .replaceAll(RegExp(r'\n```'), '')
-                .trim();
-
-        final result = json.decode(cleanedResult);
-        return result;
+        print("${loadedMeals.length} meals have been loaded.");
       } else {
-        print('Błąd: ${response.statusCode}, treść: $resBody');
-        return {
-          'name': '',
-          'grams': 0,
-          'kcal': 0,
-          'protein': 0,
-          'fats': 0,
-          'carbs': 0,
-        };
+        // jeśli brak danych — wyczyść widok
+        setState(() {
+          meals = [];
+          totalKcal = 0.0;
+          totalProtein = 0.0;
+          totalFats = 0.0;
+          totalCarbs = 0.0;
+        });
+
+        print("No meals found for $date — view cleared.");
       }
     } catch (e) {
-      print('Błąd połączenia: $e');
+      print("Error loading data from backend: $e");
+
+      // w razie błędu też lepiej wyczyścić widok, by uniknąć starych danych
+      setState(() {
+        meals = [];
+        totalKcal = 0.0;
+        totalProtein = 0.0;
+        totalFats = 0.0;
+        totalCarbs = 0.0;
+      });
+    }
+  }
+
+  Future<void> saveMeal(Map<String, dynamic> meal, [File? imageFile]) async {
+    try {
+      if (imageFile != null) {
+        final imageUrl = await ApiService.uploadMealImage(
+          imageFile,
+        ); // POST /meals/upload
+        if (imageUrl != null) {
+          meal['image_url'] = imageUrl;
+        }
+      }
+
+      await ApiService.addMeal(meal); // POST /meals
+    } catch (e) {
+      print("Error saving meal: $e");
+    }
+  }
+
+  Future<Map<String, dynamic>> analyzeMealImage(File imageFile) async {
+    try {
+      final result = await ApiService.analyzeMealImage(
+        imageFile,
+      ); // POST /analyze-meal
+      return result;
+    } catch (e) {
+      print('Error analyzing image: $e');
       return {
         'name': '',
         'grams': 0,
@@ -255,7 +193,7 @@ class _HomePageState extends State<HomePage> {
 
     _showLoadingDialog();
 
-    final analysisResult = await analyzeImageWithGemini(imageFile);
+    final analysisResult = await analyzeMealImage(imageFile);
 
     if (mounted) Navigator.of(context).pop();
 
@@ -266,13 +204,13 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
 
     if (confirmedMeal != null) {
-      await saveMealToFirestore(confirmedMeal, imageFile);
-      await loadMealsFromFirestore();
+      await saveMeal(confirmedMeal, imageFile);
+      await loadMeals();
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Anulowano dodawanie posiłku')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cancelled adding meal')));
       }
     }
   }
@@ -297,8 +235,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    print(FirebaseAuth.instance.currentUser);
-    loadMealsFromFirestore();
+    loadMeals();
     loadUserGoals();
   }
 
@@ -310,8 +247,18 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: const Color(0xFFE4E0E0),
       appBar: AppBar(
         title: const Text('Serene Health'),
+        centerTitle: true,
         actions: [
-          IconButton(onPressed: signUserOut, icon: const Icon(Icons.logout)),
+          IconButton(
+            onPressed: () {
+              AuthService.signUserOut();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+              );
+            },
+            icon: const Icon(Icons.logout),
+          ),
         ],
       ),
       drawer: Drawer(
@@ -329,7 +276,7 @@ class _HomePageState extends State<HomePage> {
             // Zakładka Profil
             ListTile(
               leading: const Icon(Icons.person),
-              title: const Text('Profil'),
+              title: const Text('Profile'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -341,7 +288,7 @@ class _HomePageState extends State<HomePage> {
             // Zakładka Statystyki (na razie nieaktywna)
             const ListTile(
               leading: Icon(Icons.bar_chart, color: Colors.grey),
-              title: Text('Statystyki', style: TextStyle(color: Colors.grey)),
+              title: Text('Statistics', style: TextStyle(color: Colors.grey)),
               enabled: false,
             ),
           ],
@@ -362,14 +309,14 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Stan na dzień: $formattedDate',
+                      'For: $formattedDate',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text('• ${meals.length} posiłków'),
+                    Text('• ${meals.length} meals'),
                     Text(
                       dailyCalorieGoal != null
                           ? '• $totalKcal kcal / $dailyCalorieGoal kcal'
@@ -389,16 +336,16 @@ class _HomePageState extends State<HomePage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Makroskładniki:',
+                                'Macronutrients:',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              Text('• Białko: $totalProtein / $proteinGoal g'),
-                              Text('• Tłuszcze: $totalFats / $fatGoal g'),
-                              Text('• Węglowodany: $totalCarbs / $carbGoal g'),
+                              Text('• Protein: $totalProtein / $proteinGoal g'),
+                              Text('• Fats: $totalFats / $fatGoal g'),
+                              Text('• Carbs: $totalCarbs / $carbGoal g'),
                             ],
                           ),
                         ),
@@ -429,7 +376,8 @@ class _HomePageState extends State<HomePage> {
                             setState(() {
                               selectedDate = day;
                             });
-                            await loadMealsFromFirestore(); // ← przeładuj dane dla nowego dnia
+                            await loadMeals();
+                            await loadUserGoals(); // ← przeładuj dane dla nowego dnia
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -471,9 +419,7 @@ class _HomePageState extends State<HomePage> {
                       padding: const EdgeInsets.all(8),
                       child:
                           meals.isEmpty
-                              ? const Center(
-                                child: Text('Brak dodanych posiłków'),
-                              )
+                              ? const Center(child: Text('No meals added yet.'))
                               : ListView.builder(
                                 itemCount: meals.length,
                                 itemBuilder: (context, index) {
@@ -526,7 +472,8 @@ class _HomePageState extends State<HomePage> {
                                         );
 
                                         if (updated == true) {
-                                          await loadMealsFromFirestore();
+                                          await loadMeals();
+                                          await loadUserGoals();
                                         }
                                       },
                                     ),
@@ -554,12 +501,12 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.camera_alt),
-                    title: const Text('Zrób zdjęcie'),
+                    title: const Text('Take a photo'),
                     onTap: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Opcja jeszcze nieaktywna'),
+                          content: Text('This option is not available yet.'),
                         ),
                       );
                     },
@@ -568,7 +515,7 @@ class _HomePageState extends State<HomePage> {
                     builder:
                         (localContext) => ListTile(
                           leading: const Icon(Icons.photo),
-                          title: const Text('Wybierz z galerii'),
+                          title: const Text('Choose from gallery'),
                           onTap: () {
                             Navigator.pop(context);
                             _handleImagePick();
@@ -578,7 +525,7 @@ class _HomePageState extends State<HomePage> {
 
                   ListTile(
                     leading: const Icon(Icons.edit),
-                    title: const Text('Dodaj ręcznie'),
+                    title: const Text('Add manually'),
                     onTap: () async {
                       Navigator.pop(context);
                       final result = await Navigator.push<Map<String, dynamic>>(
@@ -588,8 +535,8 @@ class _HomePageState extends State<HomePage> {
                         ),
                       );
                       if (result != null) {
-                        await saveMealToFirestore(result);
-                        await loadMealsFromFirestore();
+                        await saveMeal(result);
+                        await loadMeals();
                       }
                     },
                   ),
@@ -600,7 +547,7 @@ class _HomePageState extends State<HomePage> {
         },
         child: const Icon(Icons.add),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

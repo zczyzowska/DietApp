@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 import 'confirm_meal_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:diet_app/components/load_images_to_s3.dart';
+import 'package:diet_app/services/api_service.dart';
 
 class MealDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> meal;
@@ -26,9 +23,9 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
 
   Future<void> _loadSignedImageUrl() async {
     setState(() => isLoading = true);
-    final key = widget.meal['imageKey'];
+    final key = widget.meal['image_url'];
     if (key != null) {
-      final url = await fetchSignedUrl(key);
+      final url = await ApiService.getMealImageUrl(key);
       setState(() {
         imageUrl = url;
         isLoading = false;
@@ -50,20 +47,17 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
     );
 
     if (confirmedMeal != null) {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final success = await ApiService.editMeal(
+        widget.meal['id'],
+        confirmedMeal,
+      );
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('meals')
-          .doc(date)
-          .collection('items')
-          .doc(widget.meal['id'])
-          .update(confirmedMeal);
-
-      if (context.mounted) {
-        Navigator.pop(context, true); // ← zwraca true do poprzedniego widoku
+      if (success && context.mounted) {
+        Navigator.pop(context, true); // informuje poprzedni ekran
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not update meal')));
       }
     }
   }
@@ -71,39 +65,32 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
   Future<void> _deleteMeal(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Usuń posiłek'),
-          content: const Text('Czy na pewno chcesz usunąć ten posiłek?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Nie'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Tak'),
-            ),
-          ],
-        );
-      },
+      builder:
+          (BuildContext dialogContext) => AlertDialog(
+            title: const Text('Delete Meal'),
+            content: const Text('Are you sure you want to delete this meal?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('No'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Yes'),
+              ),
+            ],
+          ),
     );
 
     if (confirm == true) {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final success = await ApiService.deleteMeal(widget.meal['id']);
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('meals')
-          .doc(date)
-          .collection('items')
-          .doc(widget.meal['id'])
-          .delete();
-
-      if (context.mounted) {
+      if (success && context.mounted) {
         Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not delete meal')));
       }
     }
   }
@@ -113,7 +100,7 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
     final data = widget.meal;
 
     return Scaffold(
-      appBar: AppBar(title: Text(data['name'] ?? 'Posiłek')),
+      appBar: AppBar(title: Text(data['name'] ?? 'Meal Details')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -126,12 +113,12 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
               const SizedBox(),
 
             const SizedBox(height: 20),
-            Text('Typ: ${data['type']}'),
-            Text('Gramy: ${data['grams']} g'),
-            Text('Kalorie: ${data['kcal']} kcal'),
-            Text('Białko: ${data['protein']} g'),
-            Text('Tłuszcze: ${data['fats']} g'),
-            Text('Węglowodany: ${data['carbs']} g'),
+            Text('Type: ${data['type']}'),
+            Text('Grams: ${data['grams'].toString()} g'),
+            Text('Calories: ${data['kcal'].toString()} kcal'),
+            Text('Protein: ${data['protein'].toString()} g'),
+            Text('Fats: ${data['fats'].toString()} g'),
+            Text('Carbs: ${data['carbs'].toString()} g'),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -139,13 +126,13 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
                 ElevatedButton.icon(
                   onPressed: () => _editMeal(context),
                   icon: const Icon(Icons.edit),
-                  label: const Text('Edytuj'),
+                  label: const Text('Edit'),
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _deleteMeal(context),
                   icon: const Icon(Icons.delete),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  label: const Text('Usuń'),
+                  label: const Text('Delete'),
                 ),
               ],
             ),
