@@ -38,6 +38,7 @@ dependencies:
   dio: ^5.0.0
   flutter_dotenv: ^5.0.2
   flutter_gemini: ^3.0.0
+  fl_chart: ^0.70.0
   http: ^0.13.6
   flutter_secure_storage: ^9.0.0
   image_picker: ^1.0.7

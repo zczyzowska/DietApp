@@ -192,4 +192,74 @@ class ApiService {
       throw Exception('Error analyzing image: ${response.body}');
     }
   }
+
+  static Future<Map<String, dynamic>> analyzeMealImageCustom(
+    File imageFile,
+  ) async {
+    final token = await AuthService.getToken();
+    final uri = Uri.parse('$baseUrl/food-analysis/analyze-image');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      await http.MultipartFile.fromPath('image', imageFile.path),
+    );
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } else {
+      throw Exception('Error analyzing image: ${response.body}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getFoodInfo(String foodName) async {
+    final token = await AuthService.getToken();
+    final uri = Uri.parse(
+      '$baseUrl/food-analysis/food-info?food_name=$foodName',
+    );
+
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } else {
+      throw Exception('Error fetching food info: ${response.body}');
+    }
+  }
+
+  // Obliczenie makro dla wybranej porcji
+  static Future<Map<String, dynamic>> calculateMacro({
+    required String foodName,
+    required int portionWeight,
+    int portionCount = 1,
+  }) async {
+    final token = await AuthService.getToken();
+    final uri = Uri.parse('$baseUrl/food-analysis/calculate-macro');
+
+    final body = json.encode({
+      'food_name': foodName,
+      'portion_weight': portionWeight,
+      'portion_count': portionCount,
+    });
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } else {
+      throw Exception('Error calculating macro: ${response.body}');
+    }
+  }
 }

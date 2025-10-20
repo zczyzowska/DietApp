@@ -13,10 +13,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Diet App',
+      title: 'Serene Health',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 34, 113, 36),
+          seedColor: const Color.fromARGB(255, 186, 162, 204),
         ),
       ),
       home: AuthPage(),

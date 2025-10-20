@@ -45,5 +45,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to take meal photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to choose meal photos.</string>
+	<key>NSBonjourServices</key>
+	<array/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Ta aplikacja korzysta z sieci lokalnej do komunikacji z serwerem.</string>
 </dict>
 </plist>

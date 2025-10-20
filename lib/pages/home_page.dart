@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'add_meal_form_page.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
-import 'confirm_meal_screen.dart';
 import 'meal_details.dart';
-import 'profile_page.dart';
-import 'login_page.dart';
 import 'package:diet_app/services/api_service.dart';
-import 'package:diet_app/services/auth_service.dart';
+import 'package:diet_app/widgets/add_meal_button.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -147,91 +141,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> saveMeal(Map<String, dynamic> meal, [File? imageFile]) async {
-    try {
-      if (imageFile != null) {
-        final imageUrl = await ApiService.uploadMealImage(
-          imageFile,
-        ); // POST /meals/upload
-        if (imageUrl != null) {
-          meal['image_url'] = imageUrl;
-        }
-      }
-
-      await ApiService.addMeal(meal); // POST /meals
-    } catch (e) {
-      print("Error saving meal: $e");
-    }
-  }
-
-  Future<Map<String, dynamic>> analyzeMealImage(File imageFile) async {
-    try {
-      final result = await ApiService.analyzeMealImage(
-        imageFile,
-      ); // POST /analyze-meal
-      return result;
-    } catch (e) {
-      print('Error analyzing image: $e');
-      return {
-        'name': '',
-        'grams': 0,
-        'kcal': 0,
-        'protein': 0,
-        'fats': 0,
-        'carbs': 0,
-      };
-    }
-  }
-
-  Future<void> _handleImagePick() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile == null) return;
-
-    final imageFile = File(pickedFile.path);
-
-    _showLoadingDialog();
-
-    final analysisResult = await analyzeMealImage(imageFile);
-
-    if (mounted) Navigator.of(context).pop();
-
-    if (!mounted) return;
-
-    final confirmedMeal = await _navigateToConfirmScreen(analysisResult);
-
-    if (!mounted) return;
-
-    if (confirmedMeal != null) {
-      await saveMeal(confirmedMeal, imageFile);
-      await loadMeals();
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Cancelled adding meal')));
-      }
-    }
-  }
-
-  void _showLoadingDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(child: CircularProgressIndicator()),
-    );
-  }
-
-  Future<Map<String, dynamic>?> _navigateToConfirmScreen(
-    Map<String, dynamic> data,
-  ) {
-    return Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(builder: (_) => ConfirmMealScreen(mealData: data)),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
@@ -243,89 +152,35 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final String formattedDate = DateFormat('dd.MM.yyyy').format(selectedDate);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFE4E0E0),
-      appBar: AppBar(
-        title: const Text('Serene Health'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {
-              AuthService.signUserOut();
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-              );
-            },
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            Container(
-              height: 80,
-              padding: const EdgeInsets.all(16.0),
-              alignment: Alignment.centerLeft,
-              child: const Text(
-                'Menu',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            // Zakładka Profil
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('Profile'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
-                );
-              },
-            ),
-            // Zakładka Statystyki (na razie nieaktywna)
-            const ListTile(
-              leading: Icon(Icons.bar_chart, color: Colors.grey),
-              title: Text('Statistics', style: TextStyle(color: Colors.grey)),
-              enabled: false,
-            ),
-          ],
-        ),
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'For: $formattedDate',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'For: $formattedDate',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('• ${meals.length} meals'),
-                    Text(
-                      dailyCalorieGoal != null
-                          ? '• $totalKcal kcal / $dailyCalorieGoal kcal'
-                          : '• $totalKcal kcal / 2000 kcal',
-                    ),
-                    if (dailyCalorieGoal != null &&
-                        proteinGoal != null &&
-                        fatGoal != null &&
-                        carbGoal != null)
+                      const SizedBox(height: 8),
+                      Text('• ${meals.length} meals'),
+                      Text(
+                        dailyCalorieGoal != null
+                            ? '• $totalKcal kcal / $dailyCalorieGoal kcal'
+                            : '• $totalKcal kcal / 2000 kcal',
+                      ),
                       if (dailyCalorieGoal != null &&
                           proteinGoal != null &&
                           fatGoal != null &&
@@ -349,205 +204,166 @@ class _HomePageState extends State<HomePage> {
                             ],
                           ),
                         ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Column(
-                children: [
-                  // MINI KALENDARZ
-                  SizedBox(
-                    height: 60,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: 5,
-                      itemBuilder: (context, index) {
-                        final day = DateTime.now().subtract(
-                          Duration(days: 4 - index),
-                        );
-                        final isSelected =
-                            DateFormat('yyyy-MM-dd').format(day) ==
-                            DateFormat('yyyy-MM-dd').format(selectedDate);
+              const SizedBox(height: 16),
+              Expanded(
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 60,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: 5,
+                        itemBuilder: (context, index) {
+                          final day = DateTime.now().subtract(
+                            Duration(days: 4 - index),
+                          );
+                          final isSelected =
+                              DateFormat('yyyy-MM-dd').format(day) ==
+                              DateFormat('yyyy-MM-dd').format(selectedDate);
 
-                        return GestureDetector(
-                          onTap: () async {
-                            setState(() {
-                              selectedDate = day;
-                            });
-                            await loadMeals();
-                            await loadUserGoals(); // ← przeładuj dane dla nowego dnia
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Container(
-                              width: 50,
-                              decoration: BoxDecoration(
-                                color:
-                                    isSelected
-                                        ? Colors.amber[200]
-                                        : Colors.grey[200],
-                                borderRadius: BorderRadius.circular(8),
+                          return GestureDetector(
+                            onTap: () async {
+                              setState(() {
+                                selectedDate = day;
+                              });
+                              await loadMeals();
+                              await loadUserGoals();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
                               ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                '${day.day}',
-                                style: TextStyle(
-                                  fontWeight:
+                              child: Container(
+                                width: 50,
+                                decoration: BoxDecoration(
+                                  color:
                                       isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                  fontSize: 18,
+                                          ? Colors.amber[200]
+                                          : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${day.day}',
+                                  style: TextStyle(
+                                    fontWeight:
+                                        isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                    fontSize: 18,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // LISTA POSIŁKÓW
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                          );
+                        },
                       ),
-                      padding: const EdgeInsets.all(8),
-                      child:
-                          meals.isEmpty
-                              ? const Center(child: Text('No meals added yet.'))
-                              : ListView.builder(
-                                itemCount: meals.length,
-                                itemBuilder: (context, index) {
-                                  final reversedIndex =
-                                      meals.length - 1 - index;
-                                  final reversedMeal = meals[reversedIndex];
-
-                                  final String type = reversedMeal['type'];
-                                  final IconData icon = _getMealIcon(type);
-
-                                  return Card(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    margin: const EdgeInsets.symmetric(
-                                      vertical: 6,
-                                    ),
-                                    child: ListTile(
-                                      leading: Icon(icon, size: 32),
-                                      title: Text(
-                                        type,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            reversedMeal['name'],
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text('${reversedMeal['kcal']} kcal'),
-                                        ],
-                                      ),
-                                      onTap: () async {
-                                        final updated = await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (_) => MealDetailsScreen(
-                                                  meal: reversedMeal,
-                                                ),
-                                          ),
-                                        );
-
-                                        if (updated == true) {
-                                          await loadMeals();
-                                          await loadUserGoals();
-                                        }
-                                      },
-                                    ),
-                                  );
-                                },
-                              ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            builder: (BuildContext context) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.camera_alt),
-                    title: const Text('Take a photo'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('This option is not available yet.'),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                      );
-                    },
-                  ),
-                  Builder(
-                    builder:
-                        (localContext) => ListTile(
-                          leading: const Icon(Icons.photo),
-                          title: const Text('Choose from gallery'),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _handleImagePick();
-                          },
-                        ),
-                  ),
+                        padding: const EdgeInsets.all(8),
+                        child:
+                            meals.isEmpty
+                                ? const Center(
+                                  child: Text('No meals added yet.'),
+                                )
+                                : ListView.builder(
+                                  itemCount: meals.length,
+                                  itemBuilder: (context, index) {
+                                    final reversedIndex =
+                                        meals.length - 1 - index;
+                                    final reversedMeal = meals[reversedIndex];
+                                    final String type = reversedMeal['type'];
+                                    final IconData icon = _getMealIcon(type);
 
-                  ListTile(
-                    leading: const Icon(Icons.edit),
-                    title: const Text('Add manually'),
-                    onTap: () async {
-                      Navigator.pop(context);
-                      final result = await Navigator.push<Map<String, dynamic>>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AddMealFormPage(),
-                        ),
-                      );
-                      if (result != null) {
-                        await saveMeal(result);
-                        await loadMeals();
-                      }
-                    },
+                                    return Card(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      margin: const EdgeInsets.symmetric(
+                                        vertical: 6,
+                                      ),
+                                      child: ListTile(
+                                        leading: Icon(icon, size: 32),
+                                        title: Text(
+                                          type,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              reversedMeal['name'],
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${reversedMeal['kcal']} kcal',
+                                            ),
+                                          ],
+                                        ),
+                                        onTap: () async {
+                                          final updated = await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (_) => MealDetailsScreen(
+                                                    meal: reversedMeal,
+                                                  ),
+                                            ),
+                                          );
+
+                                          if (updated == true) {
+                                            await loadMeals();
+                                            await loadUserGoals();
+                                          }
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: 20,
+          right: 20,
+          child: AddMealButton(
+            onMealSaved: (meal, [imageFile]) async {
+              await loadMeals();
+              await loadUserGoals();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('New meal added successfully!'),
+                    duration: Duration(seconds: 2),
                   ),
-                ],
-              );
+                );
+              }
             },
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          ),
+        ),
+      ],
     );
   }
 }

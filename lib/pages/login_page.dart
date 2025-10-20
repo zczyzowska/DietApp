@@ -3,7 +3,7 @@ import 'package:diet_app/components/my_textfield.dart';
 import 'package:diet_app/components/square_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:diet_app/services/auth_service.dart';
-import 'package:diet_app/pages/home_page.dart';
+import 'main_page.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -14,20 +14,17 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  //text editing controllers
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
   bool _isLoading = false;
 
-  // 🔹 Logowanie użytkownika z backendem Flask
   Future<void> signUserIn() async {
     setState(() => _isLoading = true);
 
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    // prostą walidację pól możesz dodać tutaj
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -43,7 +40,7 @@ class _LoginPageState extends State<LoginPage> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
+          MaterialPageRoute(builder: (_) => const MainPage()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -62,7 +59,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 222, 225, 215),
+      backgroundColor: const Color.fromARGB(255, 223, 215, 225),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

@@ -59,7 +59,7 @@ class _ProfilePageState extends State<ProfilePage> {
       'weight': _weight ?? 0.0,
       'activityLevel': _activityLevel,
       'goal': _goal,
-      'targetWeight': _targetWeight ?? 0.0,
+      'targetWeight': _targetWeight ?? _weight ?? 0.0,
       'durationWeeks': _durationWeeks ?? 0,
     };
 

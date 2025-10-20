@@ -4,8 +4,8 @@ import 'package:http/http.dart' as http;
 
 class AuthService {
   static const _storage = FlutterSecureStorage();
-  static const String _baseUrl = 'http://10.0.2.2:5000';
-  // static const _baseUrl = 'https://serene-health-backend.onrender.com';
+  //static const String _baseUrl = 'http://10.0.2.2:5000';
+  static const _baseUrl = 'https://serene-health-backend.onrender.com';
 
   static Future<void> saveToken(String token) async {
     await _storage.write(key: 'jwt', value: token);

@@ -1,6 +1,6 @@
 import 'package:diet_app/pages/login_or_register_page.dart';
 import 'package:flutter/material.dart';
-import 'home_page.dart';
+import 'main_page.dart';
 import 'package:diet_app/services/auth_service.dart';
 
 class AuthPage extends StatefulWidget {
@@ -55,6 +55,6 @@ class _AuthPageState extends State<AuthPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return _isLoggedIn ? const HomePage() : const LoginOrRegisterPage();
+    return _isLoggedIn ? const MainPage() : const LoginOrRegisterPage();
   }
 }
