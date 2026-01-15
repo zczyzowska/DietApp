@@ -19,6 +19,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscureText = true;
+  bool _obscureTextConfirm = true;
 
   Future<void> signUserUp() async {
     final email = emailController.text.trim();
@@ -110,14 +112,36 @@ class _RegisterPageState extends State<RegisterPage> {
                 MyTextfield(
                   controller: passwordController,
                   hintText: 'Password',
-                  obscureText: true,
+                  obscureText: _obscureText,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureText ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureText = !_obscureText;
+                      });
+                    },
+                  ),
                 ),
                 //confirm password textfield
                 const SizedBox(height: 10),
                 MyTextfield(
                   controller: confirmPasswordController,
                   hintText: 'Confirm Password',
-                  obscureText: true,
+                  obscureText: _obscureTextConfirm,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureTextConfirm
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureTextConfirm = !_obscureTextConfirm;
+                      });
+                    },
+                  ),
                 ),
                 SizedBox(height: 25),
                 //sign in button

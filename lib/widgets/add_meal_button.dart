@@ -209,63 +209,69 @@ class _AddMealButtonState extends State<AddMealButton> {
     );
 
     if (confirmedMeal != null) {
-      await ApiService.uploadMealImage(imageFile).then((url) async {
-        if (url != null) confirmedMeal['image_url'] = url;
-        await ApiService.addMeal(confirmedMeal);
-        widget.onMealSaved?.call(confirmedMeal, imageFile);
-      });
+      final savedMeal = await ApiService.saveMeal(confirmedMeal, imageFile);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // ← TU zamykasz loader
+        widget.onMealSaved?.call(savedMeal, imageFile);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton(
-      onPressed: () {
-        showModalBottomSheet(
-          context: context,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    return SafeArea(
+      child: Wrap(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text('Take a photo'),
+            onTap: () => _handleImagePick(ImageSource.camera),
           ),
-          builder:
-              (_) => Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.camera_alt),
-                    title: const Text('Take a photo'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _handleImagePick(ImageSource.camera);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.photo),
-                    title: const Text('Choose from gallery'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _handleImagePick(ImageSource.gallery);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.edit),
-                    title: const Text('Add manually'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AddMealFormPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-        );
-      },
-      foregroundColor: Colors.white,
-      backgroundColor: Colors.indigo[400],
-      child: const Icon(Icons.add),
+          ListTile(
+            leading: const Icon(Icons.photo),
+            title: const Text('Choose from gallery'),
+            onTap: () => _handleImagePick(ImageSource.gallery),
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('Add manually'),
+            onTap: () async {
+              // Czekaj na dane z formularza
+              final manualMeal = await Navigator.push<Map<String, dynamic>>(
+                context,
+                MaterialPageRoute(builder: (_) => const AddMealFormPage()),
+              );
+
+              if (manualMeal != null && manualMeal.isNotEmpty) {
+                try {
+                  final imageFile = manualMeal['image'] as File?;
+                  manualMeal.remove(
+                    'image',
+                  ); // nie chcemy przesyłać File w JSON
+
+                  final savedMeal = await ApiService.saveMeal(
+                    manualMeal,
+                    imageFile,
+                  );
+
+                  if (!mounted) return;
+                  Navigator.of(context).pop(); // zamknij loader
+
+                  // wywołanie callbacka (np. odświeżenie ekranu)
+                  widget.onMealSaved?.call(savedMeal, imageFile);
+                } catch (e) {
+                  if (!mounted) return;
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error saving meal: $e')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }

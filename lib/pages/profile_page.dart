@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:diet_app/services/api_service.dart'; // 🔹 Zmien na swoją ścieżkę
+import 'package:diet_app/services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:diet_app/services/auth_service.dart';
+import 'package:diet_app/pages/login_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -31,20 +34,31 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadUserProfile() async {
-    final data = await ApiService.getUserProfile(); // 🔹 GET /profile
-    if (data != null) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
       setState(() {
-        _nameController.text = data['name'] ?? '';
-        _gender = data['gender'];
-        _age = data['age'];
-        _height = (data['height'] as num?)?.toDouble();
-        _weight = (data['weight'] as num?)?.toDouble();
-        _activityLevel = data['activityLevel'] ?? 'low';
-        _goal = data['goal'] ?? 'maintain weight';
-        _targetWeight = (data['targetWeight'] as num?)?.toDouble();
-        _durationWeeks = (data['durationWeeks'] as num?)?.toInt();
-        _calculatedData = data['calculated'] as Map<String, dynamic>?;
+        _nameController.text = prefs.getString('name') ?? '';
+        _gender = prefs.getString('gender');
+        _age = prefs.getInt('age');
+        _height = prefs.getDouble('height');
+        _weight = prefs.getDouble('weight');
+        _activityLevel = prefs.getString('activityLevel') ?? 'low';
+        _goal = prefs.getString('goal') ?? 'maintain weight';
+        _targetWeight = prefs.getDouble('targetWeight');
+        _durationWeeks = prefs.getInt('durationWeeks');
+
+        _calculatedData = {
+          'kcal': prefs.getDouble('kcal') ?? 0,
+          'protein': prefs.getDouble('protein') ?? 0,
+          'fats': prefs.getDouble('fats') ?? 0,
+          'carbs': prefs.getDouble('carbs') ?? 0,
+        };
       });
+
+      print("Dane użytkownika wczytane z SharedPreferences");
+    } catch (e) {
+      print('Błąd podczas wczytywania profilu z SharedPreferences: $e');
     }
   }
 
@@ -92,49 +106,146 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProfileSummary() {
-    if (_gender == null || _age == null || _height == null || _weight == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Profile incomplete', style: TextStyle(fontSize: 18)),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () => setState(() => _isEditing = true),
-            child: const Text('Edit Profile'),
-          ),
-        ],
-      );
-    }
-
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Name: ${_nameController.text}'),
-        Text('Gender: $_gender'),
-        Text('Age: $_age years'),
-        Text('Height: ${_height!.toStringAsFixed(1)} cm'),
-        Text('Weight: ${_weight!.toStringAsFixed(1)} kg'),
-        Text('Activity Level: $_activityLevel'),
-        Text('Goal: $_goal'),
-        if (_targetWeight != null)
-          Text('Target Weight: ${_targetWeight!.toStringAsFixed(1)} kg'),
-        const SizedBox(height: 16),
-        if (_calculatedData != null) ...[
-          const Text(
-            'Daily Caloric Needs:',
-            style: TextStyle(fontWeight: FontWeight.bold),
+        const SizedBox(height: 20),
+
+        // 🔸 Avatar (ikona w przyszłości zastąpisz zdjęciem)
+        Center(
+          child: CircleAvatar(
+            radius: 60,
+            backgroundColor: Colors.grey.shade300,
+            child: const Icon(Icons.person, size: 70, color: Colors.white),
           ),
-          Text('Calories: ${_calculatedData!['kcal']} kcal'),
-          Text('Protein: ${_calculatedData!['protein']} g'),
-          Text('Fats: ${_calculatedData!['fats']} g'),
-          Text('Carbs: ${_calculatedData!['carbs']} g'),
-        ],
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: () => setState(() => _isEditing = true),
-          child: const Text('Edit Profile'),
         ),
+
+        const SizedBox(height: 20),
+
+        // 🔸 Imię
+        Text(
+          _nameController.text.isEmpty ? "No name" : _nameController.text,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+
+        const SizedBox(height: 20),
+
+        // 🔸 Karty z danymi
+        _buildProfileCard(
+          title: "Personal Data",
+          children: [
+            _profileRow("Gender", _gender ?? "-"),
+            _profileRow("Age", "${_age ?? '-'} years"),
+            _profileRow(
+              "Height",
+              _height != null ? "${_height!.toStringAsFixed(1)} cm" : "-",
+            ),
+            _profileRow(
+              "Weight",
+              _weight != null ? "${_weight!.toStringAsFixed(1)} kg" : "-",
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        _buildProfileCard(
+          title: "Lifestyle",
+          children: [
+            _profileRow("Activity Level", _activityLevel),
+            _profileRow("Goal", _goal),
+            if (_targetWeight != null)
+              _profileRow(
+                "Target Weight",
+                "${_targetWeight!.toStringAsFixed(1)} kg",
+              ),
+            if (_durationWeeks != null)
+              _profileRow("Duration", "$_durationWeeks weeks"),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        if (_calculatedData != null)
+          _buildProfileCard(
+            title: "Daily Nutritional Needs",
+            children: [
+              _profileRow("Calories", "${_calculatedData!['kcal']} kcal"),
+              _profileRow("Protein", "${_calculatedData!['protein']} g"),
+              _profileRow("Fats", "${_calculatedData!['fats']} g"),
+              _profileRow("Carbs", "${_calculatedData!['carbs']} g"),
+            ],
+          ),
+
+        const SizedBox(height: 30),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Profile'),
+              onPressed: () => setState(() => _isEditing = true),
+            ),
+            const SizedBox(width: 16), // odstęp między przyciskami
+            ElevatedButton.icon(
+              icon: const Icon(Icons.logout, color: Colors.redAccent),
+              label: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+              onPressed: () {
+                AuthService.signUserOut();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                );
+              },
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 40),
       ],
+    );
+  }
+
+  Widget _buildProfileCard({
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profileRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 

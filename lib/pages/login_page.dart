@@ -18,6 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscureText = true;
 
   Future<void> signUserIn() async {
     setState(() => _isLoading = true);
@@ -90,7 +91,17 @@ class _LoginPageState extends State<LoginPage> {
                 MyTextfield(
                   controller: passwordController,
                   hintText: 'Password',
-                  obscureText: true,
+                  obscureText: _obscureText,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureText ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureText = !_obscureText;
+                      });
+                    },
+                  ),
                 ),
                 const SizedBox(height: 10),
                 //forgot password?
@@ -106,6 +117,39 @@ class _LoginPageState extends State<LoginPage> {
                 _isLoading
                     ? const CircularProgressIndicator()
                     : MyButton(onTap: signUserIn, text: 'Sign In'),
+                const SizedBox(height: 50),
+                //not a member? register now
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Not a member?',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 100, 99, 99),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RegisterPage(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Register now',
+                        style: TextStyle(
+                          color: Colors.indigo[400],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 50),
                 // or continue with
                 Row(
@@ -133,39 +177,6 @@ class _LoginPageState extends State<LoginPage> {
                     SquareTile(imagePath: 'lib/images/google.png'),
                     SizedBox(width: 25),
                     SquareTile(imagePath: 'lib/images/apple.png'),
-                  ],
-                ),
-                const SizedBox(height: 50),
-                //not a member? register now
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Not a member?',
-                      style: TextStyle(
-                        color: Color.fromARGB(255, 100, 99, 99),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterPage(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Register now',
-                        style: TextStyle(
-                          color: Color.fromARGB(255, 213, 134, 54),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ],

@@ -1,11 +1,29 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:http/http.dart' as http;
 
 class AuthService {
   static const _storage = FlutterSecureStorage();
-  //static const String _baseUrl = 'http://10.0.2.2:5000';
-  static const _baseUrl = 'https://serene-health-backend.onrender.com';
+  static const String _baseUrl = 'http://10.0.2.2:5000';
+  //static const _baseUrl = 'https://serene-health-backend.onrender.com';
+
+  static Future<bool> isTokenValid() async {
+    final token = await getToken();
+    if (token == null) return false;
+    return !JwtDecoder.isExpired(token);
+  }
+
+  static Future<bool> ensureValidToken() async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    if (JwtDecoder.isExpired(token)) {
+      await signUserOut();
+      return false;
+    }
+    return true;
+  }
 
   static Future<void> saveToken(String token) async {
     await _storage.write(key: 'jwt', value: token);
